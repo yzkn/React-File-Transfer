@@ -7,7 +7,6 @@ import * as connectionAction from "./store/connection/connectionActions"
 import { DataType, PeerConnection } from "./helpers/peer";
 import { useAsyncState } from "./helpers/hooks";
 
-import ReactDOM from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 
 const { Title } = Typography
