@@ -8,6 +8,7 @@ import { DataType, PeerConnection } from "./helpers/peer";
 import { useAsyncState } from "./helpers/hooks";
 
 import { QRCodeSVG } from 'qrcode.react';
+import queryString from 'query-string';
 
 const { Title } = Typography
 type MenuItem = Required<MenuProps>['items'][number]
@@ -79,6 +80,23 @@ export const App: React.FC = () => {
         }
     }
 
+    const parsed = queryString.parse(window.location.search);
+    const pid = (parsed?.id || "") as string;
+    document.addEventListener("DOMContentLoaded", async () => {
+        handleStartSession();
+
+        if (pid) {
+            console.log({ pid });
+
+            // await new Promise((resolve) => setTimeout(resolve, 1000));
+            // console.log("changeConnectionInput");
+            dispatch(connectionAction.changeConnectionInput(pid));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            // console.log("handleConnectOtherPeer");
+            dispatch(connectionAction.connectPeer(pid));
+        }
+    });
+
     return (
         <Row justify={"center"} align={"top"}>
             <Col xs={24} sm={24} md={20} lg={16} xl={12}>
@@ -112,6 +130,9 @@ export const App: React.FC = () => {
                                     bgColor="#ffffff"
                                     level="H"
                                 />
+                                <Input placeholder={"URL"}
+                                    value={document.location.href + "?id=" + peer.id || ""}
+                                />
                             </Space>
                         </Space>
                     </Card>
@@ -121,6 +142,7 @@ export const App: React.FC = () => {
                                 <Input placeholder={"ID"}
                                     onChange={e => dispatch(connectionAction.changeConnectionInput(e.target.value))}
                                     required={true}
+                                    value={pid}
                                 />
                                 <Button onClick={handleConnectOtherPeer}
                                     loading={connection.loading}>Connect</Button>
