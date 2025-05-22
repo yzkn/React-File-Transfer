@@ -7,6 +7,9 @@ import * as connectionAction from "./store/connection/connectionActions"
 import { DataType, PeerConnection } from "./helpers/peer";
 import { useAsyncState } from "./helpers/hooks";
 
+import ReactDOM from 'react-dom';
+import { QRCodeSVG } from 'qrcode.react';
+
 const { Title } = Typography
 type MenuItem = Required<MenuProps>['items'][number]
 
@@ -86,13 +89,31 @@ export const App: React.FC = () => {
                         <Button onClick={handleStartSession} loading={peer.loading}>Start</Button>
                     </Card>
                     <Card hidden={!peer.started}>
-                        <Space direction="horizontal">
-                            <div>ID: {peer.id}</div>
-                            <Button icon={<CopyOutlined />} onClick={async () => {
-                                await navigator.clipboard.writeText(peer.id || "")
-                                message.info("Copied: " + peer.id)
-                            }} />
-                            <Button danger onClick={handleStopSession}>Stop</Button>
+                        <Space direction="vertical">
+                            <Space direction="horizontal">
+                                <div>ID: {peer.id}</div>
+                                <Button icon={<CopyOutlined />} onClick={async () => {
+                                    await navigator.clipboard.writeText(peer.id || "")
+                                    message.info("Copied: " + peer.id)
+                                }} />
+                                <Button danger onClick={handleStopSession}>Stop</Button>
+                            </Space>
+                            <Space direction="horizontal" size="large">
+                                {/* <QRCodeSVG
+                                    value={peer.id || ""}
+                                    title={peer.id || ""}
+                                    className="w-full h-full p-6"
+                                    bgColor="#ffffff"
+                                    level="H"
+                                /> */}
+                                <QRCodeSVG
+                                    value={document.location.href + "?id=" + peer.id || ""}
+                                    title={document.location.href + "?id=" + peer.id || ""}
+                                    className="w-full h-full p-6"
+                                    bgColor="#ffffff"
+                                    level="H"
+                                />
+                            </Space>
                         </Space>
                     </Card>
                     <div hidden={!peer.started}>
