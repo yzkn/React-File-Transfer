@@ -94,9 +94,9 @@ export const App: React.FC = () => {
             // await new Promise((resolve) => setTimeout(resolve, 1000));
             // console.log("changeConnectionInput");
             dispatch(connectionAction.changeConnectionInput(pid));
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            // await new Promise((resolve) => setTimeout(resolve, 1000));
             // console.log("handleConnectOtherPeer");
-            dispatch(connectionAction.connectPeer(pid));
+            // dispatch(connectionAction.connectPeer(pid));
         }
     });
 
