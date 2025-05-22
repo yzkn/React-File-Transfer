@@ -80,9 +80,12 @@ export const App: React.FC = () => {
         }
     }
 
+    console.log('window.location.search', window.location.search);
     const parsed = queryString.parse(window.location.search);
+    console.log({ parsed });
     const pid = (parsed?.id || "") as string;
-    document.addEventListener("DOMContentLoaded", async () => {
+    window.addEventListener("load", async () => {
+        console.log({ pid });
         handleStartSession();
 
         if (pid) {
