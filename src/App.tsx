@@ -94,7 +94,7 @@ export const App: React.FC = () => {
         console.log({ pid });
         handleStartSession();
 
-        if (pid) {
+        if (pid !== "") {
             console.log('if pid', pid);
 
             setState(pid);
