@@ -83,20 +83,30 @@ export const App: React.FC = () => {
     const [pid, setState] = useState("");
 
     window.addEventListener("load", async () => {
+        console.log('load');
+
         console.log('window.location.search', window.location.search);
+
         const parsed = queryString.parse(window.location.search);
         console.log({ parsed });
+
         const pid = (parsed?.id || "") as string;
         console.log({ pid });
         handleStartSession();
 
         if (pid) {
-            console.log({ pid });
+            console.log('if pid', pid);
 
             setState(pid);
+            console.log('setState()', pid);
+
             dispatch(connectionAction.changeConnectionInput(pid));
+            console.log('changeConnectionInput()', pid);
+
             await new Promise((resolve) => setTimeout(resolve, 2000));
+
             dispatch(connectionAction.connectPeer(pid));
+            console.log('connectPeer()', pid);
         }
     });
 
