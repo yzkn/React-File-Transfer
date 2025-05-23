@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from "react";
 import { Button, Card, Col, Input, Menu, MenuProps, message, Row, Space, Typography, Upload, UploadFile } from "antd";
 import { CopyOutlined, UploadOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
@@ -80,22 +80,22 @@ export const App: React.FC = () => {
         }
     }
 
-    console.log('window.location.search', window.location.search);
-    const parsed = queryString.parse(window.location.search);
-    console.log({ parsed });
-    const pid = (parsed?.id || "") as string;
+    const [pid, setState] = useState("");
+
     window.addEventListener("load", async () => {
+        console.log('window.location.search', window.location.search);
+        const parsed = queryString.parse(window.location.search);
+        console.log({ parsed });
+        const pid = (parsed?.id || "") as string;
         console.log({ pid });
         handleStartSession();
 
         if (pid) {
             console.log({ pid });
 
-            // await new Promise((resolve) => setTimeout(resolve, 1000));
-            // console.log("changeConnectionInput");
+            setState(pid);
             dispatch(connectionAction.changeConnectionInput(pid));
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            // console.log("handleConnectOtherPeer");
+            await new Promise((resolve) => setTimeout(resolve, 2000));
             dispatch(connectionAction.connectPeer(pid));
         }
     });
@@ -118,25 +118,39 @@ export const App: React.FC = () => {
                                 }} />
                                 <Button danger onClick={handleStopSession}>Stop</Button>
                             </Space>
-                            <Space direction="horizontal" size="large">
-                                {/* <QRCodeSVG
+                            <Card hidden={pid !== ''}>
+                                <Space direction="horizontal" size="large">
+                                    {/* <QRCodeSVG
                                     value={peer.id || ""}
                                     title={peer.id || ""}
                                     className="w-full h-full p-6"
                                     bgColor="#ffffff"
                                     level="H"
                                 /> */}
-                                <QRCodeSVG
-                                    value={document.location.href + "?id=" + peer.id || ""}
-                                    title={document.location.href + "?id=" + peer.id || ""}
-                                    className="w-full h-full p-6"
-                                    bgColor="#ffffff"
-                                    level="H"
-                                />
-                                <Input placeholder={"URL"}
-                                    value={document.location.href + "?id=" + peer.id || ""}
-                                />
-                            </Space>
+                                    <QRCodeSVG
+                                        value={document.location.href + "?id=" + peer.id || ""}
+                                        title={document.location.href + "?id=" + peer.id || ""}
+                                        className="w-full h-full p-6"
+                                        bgColor="#ffffff"
+                                        level="H"
+                                    />
+                                    <Input placeholder={"URL"}
+                                        onFocus={e => e.target.select()}
+                                        value={document.location.href + "?id=" + peer.id || ""}
+                                    />
+                                    <a
+                                        href={document.location.href + "?id=" + peer.id || ""}
+                                        rel="noreferrer"
+                                        target="_blank">
+                                        <img src="./new_window.png"
+                                            className="new-window"
+                                            alt="Open in a new window"
+                                            width="16"
+                                            height="16"
+                                        />
+                                    </a>
+                                </Space>
+                            </Card>
                         </Space>
                     </Card>
                     <div hidden={!peer.started}>
