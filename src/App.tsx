@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button, Card, Col, Input, Menu, MenuProps, message, Row, Space, Typography, Upload, UploadFile } from "antd";
 import { CopyOutlined, UploadOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
@@ -82,7 +82,7 @@ export const App: React.FC = () => {
 
     const [pid, setState] = useState("");
 
-    window.addEventListener("load", async () => {
+    const init = async () => {
         console.log('load');
 
         console.log('window.location.search', window.location.search);
@@ -108,7 +108,19 @@ export const App: React.FC = () => {
             dispatch(connectionAction.connectPeer(pid));
             console.log('connectPeer()', pid);
         }
-    });
+    };
+
+    useEffect(() => {
+        if (document.readyState === "complete") {
+            init();
+        } else {
+            window.addEventListener("load", init);
+            return () => {
+                window.removeEventListener("load", init);
+            };
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <Row justify={"center"} align={"top"}>
