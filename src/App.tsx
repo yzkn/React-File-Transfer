@@ -79,7 +79,7 @@ export const App: React.FC = () => {
         }
     }
 
-    const [pid, setState] = useState("");
+    const [pid, setStr] = useState("");
 
     const init = async () => {
         console.log('load');
@@ -96,7 +96,7 @@ export const App: React.FC = () => {
         if (pid !== "") {
             console.log('if pid', pid);
 
-            setState(pid);
+            setStr(pid);
             console.log('setState()', pid);
 
             dispatch(connectionAction.changeConnectionInput(pid));
@@ -176,7 +176,7 @@ export const App: React.FC = () => {
                     <Card>
                         <Space direction="horizontal" size="large">
                             <Input placeholder={"ID"}
-                                onChange={e => dispatch(connectionAction.changeConnectionInput(e.target.value))}
+                                onChange={e => { setStr(e.target.value); dispatch(connectionAction.changeConnectionInput(e.target.value)) }}
                                 required={true}
                                 value={pid}
                             />
