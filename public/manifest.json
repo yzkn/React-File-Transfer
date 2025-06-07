@@ -1,6 +1,19 @@
 {
-  "short_name": "File Transfer",
-  "name": "File Transfer",
+  "background_color": "#ffffff",
+  "categories": [
+    "utilities"
+  ],
+  "description": "File Transfer app that allow you to share files between iOS, Android, Windows, macOS, Linux.",
+  "dir": "ltr",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "browser"
+  ],
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
   "icons": [
     {
       "src": "favicon.ico",
@@ -461,16 +474,19 @@
       "sizes": "1024x1024"
     }
   ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#006fb9",
-  "background_color": "#ffffff",
-  "description": "File Transfer app that allow you to share files between iOS, Android, Windows, macOS, Linux.",
   "id": "File Transfer",
-  "dir": "ltr",
   "lang": "ja",
+  "name": "File Transfer",
   "orientation": "portrait",
-  "categories": [
-    "utilities"
-  ]
+  "related_applications": [
+    {
+      "platform": "windows",
+      "url": "https://fltr.pages.dev/",
+      "id": "File Transfer"
+    }
+  ],
+  "scope": "https://fltr.pages.dev/",
+  "short_name": "File Transfer",
+  "start_url": ".",
+  "theme_color": "#006fb9",
 }
