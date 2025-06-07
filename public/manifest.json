@@ -463,6 +463,14 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#006fb9"
+  "theme_color": "#006fb9",
+  "background_color": "#ffffff",
+  "description": "File Transfer app that allow you to share files between iOS, Android, Windows, macOS, Linux.",
+  "id": "File Transfer",
+  "dir": "ltr",
+  "lang": "ja",
+  "orientation": "portrait",
+  "categories": [
+    "utilities"
+  ]
 }
