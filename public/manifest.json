@@ -487,6 +487,6 @@
   ],
   "scope": "https://fltr.pages.dev/",
   "short_name": "File Transfer",
-  "start_url": ".",
+  "start_url": "https://fltr.pages.dev/",
   "theme_color": "#006fb9"
 }
