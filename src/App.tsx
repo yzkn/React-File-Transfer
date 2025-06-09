@@ -59,17 +59,25 @@ export const App: React.FC = () => {
             message.warning("Please select a connection")
             return
         }
+        console.log('connection.selectedIds', connection.selectedIds);
+        if (connection.selectedIds.length === 0) {
+            message.warning("Please select a connection")
+            return
+        }
         try {
             await setSendLoading(true);
             let file = fileList[0] as unknown as File;
             let blob = new Blob([file], { type: file.type });
 
-            await PeerConnection.sendConnection(connection.selectedId, {
-                dataType: DataType.FILE,
-                file: blob,
-                fileName: file.name,
-                fileType: file.type
-            })
+            connection.selectedIds.forEach(async selectedId => {
+                await PeerConnection.sendConnection(selectedId, {
+                    dataType: DataType.FILE,
+                    file: blob,
+                    fileName: file.name,
+                    fileType: file.type
+                })
+            });
+
             await setSendLoading(false)
             message.info("Send file successfully")
         } catch (err) {
@@ -130,7 +138,18 @@ export const App: React.FC = () => {
                 <Card hidden={!peer.started}>
                     <Space direction="vertical">
                         <Space direction="horizontal" size="large">
-                            <div>ID: {peer.id}</div>
+                            <a
+                                href={document.location.href}
+                                rel="noreferrer"
+                                target="_blank">
+                                <img src="./icon.png"
+                                    className="brand-icon"
+                                    alt="File Transfer"
+                                    width="16"
+                                    height="16"
+                                />
+                            </a>
+                            <div>ID: {peer.id ? '...' + peer.id.slice(-8) : ''}</div>
                             <Button icon={<CopyOutlined />} onClick={async () => {
                                 await navigator.clipboard.writeText(peer.id || "")
                                 message.info("Copied: " + peer.id)
@@ -186,10 +205,12 @@ export const App: React.FC = () => {
                                 connection.list.length === 0
                                     ? <div>Waiting for connection ...</div>
                                     : <div>
-                                        Select a connection
-                                        <Menu selectedKeys={connection.selectedId ? [connection.selectedId] : []}
+                                        Select a connection(s)
+                                        <Menu selectedKeys={connection.selectedIds.length > 0 ? connection.selectedIds : []}
                                             onSelect={(item) => dispatch(connectionAction.selectItem(item.key))}
-                                            items={connection.list.map(e => getItem(e, e, null))} />
+                                            onDeselect={(item) => dispatch(connectionAction.deselectItem(item.key))}
+                                            items={connection.list.map(e => getItem('...' + e.slice(-8), e, null))}
+                                            multiple={true} />
                                     </div>
                             }
                         </Space>
