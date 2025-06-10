@@ -66,17 +66,21 @@ export const App: React.FC = () => {
         }
         try {
             await setSendLoading(true);
-            let file = fileList[0] as unknown as File;
-            let blob = new Blob([file], { type: file.type });
 
-            connection.selectedIds.forEach(async selectedId => {
-                await PeerConnection.sendConnection(selectedId, {
-                    dataType: DataType.FILE,
-                    file: blob,
-                    fileName: file.name,
-                    fileType: file.type
-                })
-            });
+            for (let i = 0; i < fileList.length; i++) {
+                const file = fileList[i] as unknown as File;
+                let blob = new Blob([file], { type: file.type });
+
+                for (let j = 0; j < connection.selectedIds.length; j++) {
+                    const selectedId = connection.selectedIds[j];
+                    await PeerConnection.sendConnection(selectedId, {
+                        dataType: DataType.FILE,
+                        file: blob,
+                        fileName: file.name,
+                        fileType: file.type
+                    });
+                }
+            }
 
             await setSendLoading(false)
             message.info("Send file successfully")
@@ -217,10 +221,11 @@ export const App: React.FC = () => {
                     </Card>
                     <Card title="Send File">
                         <Upload fileList={fileList}
-                            maxCount={1}
+                            maxCount={10}
+                            multiple={true}
                             onRemove={() => setFileList([])}
-                            beforeUpload={(file) => {
-                                setFileList([file])
+                            beforeUpload={(_, fileList) => {
+                                setFileList(fileList)
                                 return false
                             }}>
                             <Button icon={<UploadOutlined />}>Select File</Button>
