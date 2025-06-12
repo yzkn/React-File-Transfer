@@ -122,7 +122,7 @@ export const App: React.FC = () => {
                 <Card hidden={pid !== ''}>
                     <Row>
                         <Col span={8} offset={8}>
-                            <a href={document.location.href + "?id=" + peer.id || ""}
+                            <a href={document.location.origin + "?id=" + peer.id || ""}
                                 rel="noreferrer"
                                 target="_blank"
                                 style={{
@@ -131,8 +131,8 @@ export const App: React.FC = () => {
                                     textAlign: "center"
                                 }}>
                                 <QRCodeSVG
-                                    value={document.location.href + "?id=" + peer.id || ""}
-                                    title={document.location.href + "?id=" + peer.id || ""}
+                                    value={document.location.origin + "?id=" + peer.id || ""}
+                                    title={document.location.origin + "?id=" + peer.id || ""}
                                     className="w-full h-full p-6"
                                     bgColor="#ffffff"
                                     level="H"
