@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Button, Card, Col, Input, Menu, MenuProps, message, Row, Space, Upload, UploadFile } from "antd";
 import { CopyOutlined, UploadOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
-import { startPeer, stopPeerSession } from "./store/peer/peerActions";
+import { startPeer } from "./store/peer/peerActions";
 import * as connectionAction from "./store/connection/connectionActions"
 import { DataType, PeerConnection } from "./helpers/peer";
 import { useAsyncState } from "./helpers/hooks";
@@ -36,11 +36,6 @@ export const App: React.FC = () => {
 
     const handleStartSession = () => {
         dispatch(startPeer())
-    }
-
-    const handleStopSession = async () => {
-        await PeerConnection.closePeerSession()
-        dispatch(stopPeerSession())
     }
 
     const handleConnectOtherPeer = () => {
@@ -94,30 +89,18 @@ export const App: React.FC = () => {
     const [pid, setStr] = useState("");
 
     const init = async () => {
-        console.log('load');
-
-        console.log('window.location.search', window.location.search);
-
         const parsed = queryString.parse(window.location.search);
-        console.log({ parsed });
 
         const pid = (parsed?.id || "") as string;
-        console.log({ pid });
         handleStartSession();
 
         if (pid !== "") {
-            console.log('if pid', pid);
-
             setStr(pid);
-            console.log('setState()', pid);
-
             dispatch(connectionAction.changeConnectionInput(pid));
-            console.log('changeConnectionInput()', pid);
 
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
             dispatch(connectionAction.connectPeer(pid));
-            console.log('connectPeer()', pid);
         }
     };
 
@@ -136,39 +119,17 @@ export const App: React.FC = () => {
     return (
         <Row justify={"center"} align={"top"}>
             <Col xs={24} sm={24} md={20} lg={16} xl={12}>
-                <Card hidden={peer.started}>
-                    <Button onClick={handleStartSession} loading={peer.loading}>Start</Button>
-                </Card>
-                <Card hidden={!peer.started}>
-                    <Space direction="vertical">
-                        <Space direction="horizontal" size="large">
-                            <a
-                                href={document.location.href}
+                <Card hidden={!peer.started && pid !== ''}>
+                    <Row>
+                        <Col span={8} offset={8}>
+                            <a href={document.location.href + "?id=" + peer.id || ""}
                                 rel="noreferrer"
-                                target="_blank">
-                                <img src="./icon.png"
-                                    className="brand-icon"
-                                    alt="File Transfer"
-                                    width="16"
-                                    height="16"
-                                />
-                            </a>
-                            <div>ID: {peer.id ? '...' + peer.id.slice(-8) : ''}</div>
-                            <Button icon={<CopyOutlined />} onClick={async () => {
-                                await navigator.clipboard.writeText(peer.id || "")
-                                message.info("Copied: " + peer.id)
-                            }} />
-                            <Button danger onClick={handleStopSession}>Stop</Button>
-                        </Space>
-                        <Card hidden={pid !== ''}>
-                            <Space direction="horizontal" size="large">
-                                {/* <QRCodeSVG
-                                    value={peer.id || ""}
-                                    title={peer.id || ""}
-                                    className="w-full h-full p-6"
-                                    bgColor="#ffffff"
-                                    level="H"
-                                /> */}
+                                target="_blank"
+                                style={{
+                                    display: "block",
+                                    margin: "64px auto",
+                                    textAlign: "center"
+                                }}>
                                 <QRCodeSVG
                                     value={document.location.href + "?id=" + peer.id || ""}
                                     title={document.location.href + "?id=" + peer.id || ""}
@@ -176,50 +137,49 @@ export const App: React.FC = () => {
                                     bgColor="#ffffff"
                                     level="H"
                                 />
-                                <Input placeholder={"URL"}
-                                    onFocus={e => e.target.select()}
-                                    value={document.location.href + "?id=" + peer.id || ""}
-                                />
-                                <a
-                                    href={document.location.href + "?id=" + peer.id || ""}
-                                    rel="noreferrer"
-                                    target="_blank">
-                                    <img src="./new_window.png"
-                                        className="new-window"
-                                        alt="Open in a new window"
-                                        width="16"
-                                        height="16"
-                                    />
-                                </a>
-                            </Space>
-                        </Card>
-                    </Space>
+                            </a>
+                        </Col>
+                    </Row>
                 </Card>
                 <div hidden={!peer.started}>
                     <Card>
-                        <Space direction="horizontal" size="large">
-                            <Input placeholder={"ID"}
-                                onChange={e => { setStr(e.target.value); dispatch(connectionAction.changeConnectionInput(e.target.value)) }}
-                                required={true}
-                                value={pid}
-                            />
-                            <Button onClick={handleConnectOtherPeer}
-                                loading={connection.loading}>Connect</Button>
-                            {
-                                connection.list.length === 0
-                                    ? <div>Waiting for connection ...</div>
-                                    : <div>
-                                        Select a connection(s)
-                                        <Menu selectedKeys={connection.selectedIds.length > 0 ? connection.selectedIds : []}
-                                            onSelect={(item) => dispatch(connectionAction.selectItem(item.key))}
-                                            onDeselect={(item) => dispatch(connectionAction.deselectItem(item.key))}
-                                            items={connection.list.map(e => getItem('...' + e.slice(-8), e, null))}
-                                            multiple={true} />
-                                    </div>
-                            }
-                        </Space>
+                        <details>
+                            <summary>宛先</summary>
+                            <Space direction="horizontal" size="large">
+                                <Space direction="vertical">
+                                    <Space direction="horizontal">
+                                        <div title={peer.id}>My ID: {peer.id ? '...' + peer.id.slice(-8) : ''}</div>
+                                        <Button icon={<CopyOutlined />} onClick={async () => {
+                                            await navigator.clipboard.writeText(peer.id || "")
+                                            message.info("Copied: " + peer.id)
+                                        }} />
+                                    </Space>
+                                    <Space direction="horizontal" size="large">
+                                        <Input placeholder={"ID"}
+                                            onChange={e => { setStr(e.target.value); dispatch(connectionAction.changeConnectionInput(e.target.value)) }}
+                                            required={true}
+                                            value={pid}
+                                        />
+                                        <Button onClick={handleConnectOtherPeer}
+                                            loading={connection.loading}>接続</Button>
+                                    </Space>
+                                </Space>
+                                {
+                                    connection.list.length === 0
+                                        ? <div>Waiting for connection ...</div>
+                                        : <div>
+                                            Select a connection(s)
+                                            <Menu selectedKeys={connection.selectedIds.length > 0 ? connection.selectedIds : []}
+                                                onSelect={(item) => dispatch(connectionAction.selectItem(item.key))}
+                                                onDeselect={(item) => dispatch(connectionAction.deselectItem(item.key))}
+                                                items={connection.list.map(e => getItem('...' + e.slice(-8), e, null))}
+                                                multiple={true} />
+                                        </div>
+                                }
+                            </Space>
+                        </details>
                     </Card>
-                    <Card title="Send File">
+                    <Card title="ファイル">
                         <Upload fileList={fileList}
                             maxCount={10}
                             multiple={true}
@@ -228,7 +188,7 @@ export const App: React.FC = () => {
                                 setFileList(fileList)
                                 return false
                             }}>
-                            <Button icon={<UploadOutlined />}>Select File</Button>
+                            <Button icon={<UploadOutlined />}>選択</Button>
                         </Upload>
                         <Button
                             type="primary"

@@ -21,7 +21,7 @@ export const ConnectionReducer: Reducer<ConnectionState> = (state = initialState
         if (newList.length === 1) {
             return { ...state, list: newList, selectedId: action.id, selectedIds: [action.id] }
         }
-        return { ...state, list: [...state.list, action.id] }
+        return { ...state, list: newList, selectedIds: newList }
     } else if (action.type === ConnectionActionType.CONNECTION_LIST_REMOVE) {
         let newList = [...state.list].filter(e => e !== action.id)
         let newIds = [...state.selectedIds].filter(e => e !== action.id)
