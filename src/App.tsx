@@ -119,7 +119,7 @@ export const App: React.FC = () => {
     return (
         <Row justify={"center"} align={"top"}>
             <Col xs={24} sm={24} md={20} lg={16} xl={12}>
-                <Card hidden={!peer.started && pid !== ''}>
+                <Card hidden={pid !== ''}>
                     <Row>
                         <Col span={8} offset={8}>
                             <a href={document.location.href + "?id=" + peer.id || ""}
@@ -141,66 +141,64 @@ export const App: React.FC = () => {
                         </Col>
                     </Row>
                 </Card>
-                <div hidden={!peer.started}>
-                    <Card>
-                        <details>
-                            <summary>宛先</summary>
-                            <Space direction="horizontal" size="large">
-                                <Space direction="vertical">
-                                    <Space direction="horizontal">
-                                        <div title={peer.id}>My ID: {peer.id ? '...' + peer.id.slice(-8) : ''}</div>
-                                        <Button icon={<CopyOutlined />} onClick={async () => {
-                                            await navigator.clipboard.writeText(peer.id || "")
-                                            message.info("Copied: " + peer.id)
-                                        }} />
-                                    </Space>
-                                    <Space direction="horizontal" size="large">
-                                        <Input placeholder={"ID"}
-                                            onChange={e => { setStr(e.target.value); dispatch(connectionAction.changeConnectionInput(e.target.value)) }}
-                                            required={true}
-                                            value={pid}
-                                        />
-                                        <Button onClick={handleConnectOtherPeer}
-                                            loading={connection.loading}>接続</Button>
-                                    </Space>
+                <Card>
+                    <details>
+                        <summary>宛先</summary>
+                        <Space direction="horizontal" size="large">
+                            <Space direction="vertical">
+                                <Space direction="horizontal">
+                                    <div title={peer.id}>My ID: {peer.id ? '...' + peer.id.slice(-8) : ''}</div>
+                                    <Button icon={<CopyOutlined />} onClick={async () => {
+                                        await navigator.clipboard.writeText(peer.id || "")
+                                        message.info("Copied: " + peer.id)
+                                    }} />
                                 </Space>
-                                {
-                                    connection.list.length === 0
-                                        ? <div>Waiting for connection ...</div>
-                                        : <div>
-                                            Select a connection(s)
-                                            <Menu selectedKeys={connection.selectedIds.length > 0 ? connection.selectedIds : []}
-                                                onSelect={(item) => dispatch(connectionAction.selectItem(item.key))}
-                                                onDeselect={(item) => dispatch(connectionAction.deselectItem(item.key))}
-                                                items={connection.list.map(e => getItem('...' + e.slice(-8), e, null))}
-                                                multiple={true} />
-                                        </div>
-                                }
+                                <Space direction="horizontal" size="large">
+                                    <Input placeholder={"ID"}
+                                        onChange={e => { setStr(e.target.value); dispatch(connectionAction.changeConnectionInput(e.target.value)) }}
+                                        required={true}
+                                        value={pid}
+                                    />
+                                    <Button onClick={handleConnectOtherPeer}
+                                        loading={connection.loading}>接続</Button>
+                                </Space>
                             </Space>
-                        </details>
-                    </Card>
-                    <Card title="ファイル">
-                        <Upload fileList={fileList}
-                            maxCount={10}
-                            multiple={true}
-                            onRemove={() => setFileList([])}
-                            beforeUpload={(_, fileList) => {
-                                setFileList(fileList)
-                                return false
-                            }}>
-                            <Button icon={<UploadOutlined />}>選択</Button>
-                        </Upload>
-                        <Button
-                            type="primary"
-                            onClick={handleUpload}
-                            disabled={fileList.length === 0}
-                            loading={sendLoading}
-                            style={{ marginTop: 16 }}
-                        >
-                            {sendLoading ? 'Sending' : 'Send'}
-                        </Button>
-                    </Card>
-                </div>
+                            {
+                                connection.list.length === 0
+                                    ? <div>Waiting for connection ...</div>
+                                    : <div>
+                                        Select a connection(s)
+                                        <Menu selectedKeys={connection.selectedIds.length > 0 ? connection.selectedIds : []}
+                                            onSelect={(item) => dispatch(connectionAction.selectItem(item.key))}
+                                            onDeselect={(item) => dispatch(connectionAction.deselectItem(item.key))}
+                                            items={connection.list.map(e => getItem('...' + e.slice(-8), e, null))}
+                                            multiple={true} />
+                                    </div>
+                            }
+                        </Space>
+                    </details>
+                </Card>
+                <Card title="ファイル">
+                    <Upload fileList={fileList}
+                        maxCount={10}
+                        multiple={true}
+                        onRemove={() => setFileList([])}
+                        beforeUpload={(_, fileList) => {
+                            setFileList(fileList)
+                            return false
+                        }}>
+                        <Button icon={<UploadOutlined />}>選択</Button>
+                    </Upload>
+                    <Button
+                        type="primary"
+                        onClick={handleUpload}
+                        disabled={fileList.length === 0}
+                        loading={sendLoading}
+                        style={{ marginTop: 16 }}
+                    >
+                        {sendLoading ? '送信中' : '送信'}
+                    </Button>
+                </Card>
             </Col>
         </Row>
     )
