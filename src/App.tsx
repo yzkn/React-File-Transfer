@@ -119,7 +119,7 @@ export const App: React.FC = () => {
     return (
         <Row justify={"center"} align={"top"}>
             <Col xs={24} sm={24} md={20} lg={16} xl={12}>
-                <Card hidden={(pid !== '') && (typeof peer.id !== 'undefined')}>
+                <Card hidden={pid !== ''}>
                     <Row>
                         <Col span={8} offset={8}>
                             <a href={document.location.origin + "?id=" + peer.id || ""}
