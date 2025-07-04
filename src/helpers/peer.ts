@@ -14,7 +14,21 @@ export interface Data {
     message?: string
 }
 
-const PEERJS_ID = 'fltr';
+const generateId = () => {
+    // 利用する文字は、形が似ていたり、音が似ているものを除いて定義
+    const letters = 'AFHJKLRSUVWXYZ345678';
+    const len = 3;
+
+    let generated = '';
+    for (var i = 0; i < len; i++) {
+        generated += letters.charAt(Math.floor(Math.random() * letters.length));
+    }
+
+    return generated;
+};
+
+
+const PEERJS_ID = generateId();
 
 let peer: Peer | undefined
 let connectionMap: Map<string, DataConnection> = new Map<string, DataConnection>()

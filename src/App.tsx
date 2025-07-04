@@ -147,7 +147,7 @@ export const App: React.FC = () => {
                         <Space direction="horizontal" size="large">
                             <Space direction="vertical">
                                 <Space direction="horizontal">
-                                    <div title={peer.id}>My ID: {peer.id ? '...' + peer.id.slice(-8) : ''}</div>
+                                    <div title={peer.id}>My ID: {peer.id ? peer.id : ''}</div>
                                     <Button icon={<CopyOutlined />} onClick={async () => {
                                         await navigator.clipboard.writeText(peer.id || "")
                                         message.info("Copied: " + peer.id)
@@ -171,7 +171,7 @@ export const App: React.FC = () => {
                                         <Menu selectedKeys={connection.selectedIds.length > 0 ? connection.selectedIds : []}
                                             onSelect={(item) => dispatch(connectionAction.selectItem(item.key))}
                                             onDeselect={(item) => dispatch(connectionAction.deselectItem(item.key))}
-                                            items={connection.list.map(e => getItem('...' + e.slice(-8), e, null))}
+                                            items={connection.list.map(e => getItem(e, e, null))}
                                             multiple={true} />
                                     </div>
                             }
