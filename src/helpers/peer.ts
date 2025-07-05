@@ -17,7 +17,7 @@ export interface Data {
 const generateId = () => {
     // 利用する文字は、形が似ていたり、音が似ているものを除いて定義
     const letters = 'AFHJKLRSUVWXYZ345678';
-    const len = 3;
+    const len = 4;
 
     let generated = '';
     for (var i = 0; i < len; i++) {
