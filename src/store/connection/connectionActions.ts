@@ -33,11 +33,11 @@ export const connectPeer: (id: string) => (dispatch: Dispatch) => Promise<void>
         try {
             await PeerConnection.connectPeer(id)
             PeerConnection.onConnectionDisconnected(id, () => {
-                message.info("Connection closed: " + id)
+                message.info("接続が切れました: " + id)
                 dispatch(removeConnectionList(id))
             })
             PeerConnection.onConnectionReceiveData(id, (file) => {
-                message.info("Receiving file " + file.fileName + " from " + id)
+                message.info(id + " からファイル「" + file.fileName + "」を受け取っています")
                 if (file.dataType === DataType.FILE) {
                     download(file.file || '', file.fileName || "fileName", file.fileType)
                 }
