@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button, Card, Col, Input, Menu, MenuProps, message, Row, Space, Upload, UploadFile } from "antd";
+import { Button, Card, Col, Input, Menu, MenuProps, message, Row, Space, Typography, Upload, UploadFile } from "antd";
 import { CopyOutlined, UploadOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import { startPeer } from "./store/peer/peerActions";
@@ -39,7 +39,7 @@ export const App: React.FC = () => {
     }
 
     const handleConnectOtherPeer = () => {
-        connection.id != null ? dispatch(connectionAction.connectPeer(connection.id || "")) : message.warning("Please enter ID")
+        connection.id != null ? dispatch(connectionAction.connectPeer(connection.id || "")) : message.warning("相手の ID を入力してください")
     }
 
     const [fileList, setFileList] = useAsyncState([] as UploadFile[])
@@ -47,16 +47,16 @@ export const App: React.FC = () => {
 
     const handleUpload = async () => {
         if (fileList.length === 0) {
-            message.warning("Please select file")
+            message.warning("ファイルを選んでください")
             return
         }
         if (!connection.selectedId) {
-            message.warning("Please select a connection")
+            message.warning("送る相手を選んでください")
             return
         }
         console.log('connection.selectedIds', connection.selectedIds);
         if (connection.selectedIds.length === 0) {
-            message.warning("Please select a connection")
+            message.warning("送る相手を選んでください")
             return
         }
         try {
@@ -78,15 +78,27 @@ export const App: React.FC = () => {
             }
 
             await setSendLoading(false)
-            message.info("Send file successfully")
+            message.success("送信しました")
         } catch (err) {
             await setSendLoading(false)
             console.log(err)
-            message.error("Error when sending file")
+            message.error("送信できませんでした")
         }
     }
 
     const [pid, setStr] = useState("");
+
+    const shareUrl = document.location.origin + "?id=" + (peer.id || "");
+
+    const copyText = async (text: string, label: string) => {
+        try {
+            await navigator.clipboard.writeText(text)
+            message.success(label + " をコピーしました")
+        } catch (err) {
+            console.log(err)
+            message.error(label + " をコピーできませんでした")
+        }
+    }
 
     const init = async () => {
         const parsed = queryString.parse(window.location.search);
@@ -122,17 +134,17 @@ export const App: React.FC = () => {
                 <Card hidden={pid !== '' || typeof peer.id === "undefined"}>
                     <Row>
                         <Col span={8} offset={8}>
-                            <a href={document.location.origin + "?id=" + peer.id || ""}
+                            <a href={shareUrl}
                                 rel="noreferrer"
                                 target="_blank"
                                 style={{
                                     display: "block",
-                                    margin: "64px auto",
+                                    margin: "64px auto 16px",
                                     textAlign: "center"
                                 }}>
                                 <QRCodeSVG
-                                    value={document.location.origin + "?id=" + peer.id || ""}
-                                    title={document.location.origin + "?id=" + peer.id || ""}
+                                    value={shareUrl}
+                                    title={shareUrl}
                                     className="w-full h-full p-6"
                                     bgColor="#ffffff"
                                     level="H"
@@ -140,43 +152,46 @@ export const App: React.FC = () => {
                             </a>
                         </Col>
                     </Row>
-                </Card>
-                <Card>
-                    <details>
-                        <summary>宛先</summary>
-                        <Space direction="horizontal" size="large">
-                            <Space direction="vertical">
-                                <Space direction="horizontal">
-                                    <div title={peer.id}>My ID: {peer.id ? peer.id : ''}</div>
-                                    <Button icon={<CopyOutlined />} onClick={async () => {
-                                        await navigator.clipboard.writeText(peer.id || "")
-                                        message.info("Copied: " + peer.id)
-                                    }} />
-                                </Space>
-                                <Space direction="horizontal" size="large">
-                                    <Input placeholder={"ID"}
-                                        onChange={e => { setStr(e.target.value); dispatch(connectionAction.changeConnectionInput(e.target.value)) }}
-                                        required={true}
-                                        value={pid}
-                                    />
-                                    <Button onClick={handleConnectOtherPeer}
-                                        loading={connection.loading}>接続</Button>
-                                </Space>
-                            </Space>
-                            {
-                                connection.list.length === 0
-                                    ? <div>Waiting for connection ...</div>
-                                    : <div>
-                                        Select a connection(s)
-                                        <Menu selectedKeys={connection.selectedIds.length > 0 ? connection.selectedIds : []}
-                                            onSelect={(item) => dispatch(connectionAction.selectItem(item.key))}
-                                            onDeselect={(item) => dispatch(connectionAction.deselectItem(item.key))}
-                                            items={connection.list.map(e => getItem(e, e, null))}
-                                            multiple={true} />
-                                    </div>
-                            }
+                    <div style={{ textAlign: "center" }}>
+                        <p>この QR を相手の端末で読み取るか、下の URL を相手に送ると、この端末とつながります</p>
+                        <Space direction="horizontal" wrap style={{ justifyContent: "center" }}>
+                            <Typography.Text code style={{ wordBreak: "break-all" }}>{shareUrl}</Typography.Text>
+                            <Button icon={<CopyOutlined />} aria-label="URL をコピー" onClick={() => copyText(shareUrl, "URL")}>コピー</Button>
                         </Space>
-                    </details>
+                    </div>
+                </Card>
+                <Card title="宛先">
+                    <Space direction="vertical" style={{ width: "100%" }}>
+                        <Space direction="horizontal" wrap>
+                            <div title={peer.id}>自分の ID: {peer.id ? peer.id : '準備中…'}</div>
+                            <Button icon={<CopyOutlined />} aria-label="自分の ID をコピー" disabled={!peer.id}
+                                onClick={() => copyText(peer.id || "", "自分の ID")} />
+                        </Space>
+                        {
+                            connection.list.length === 0
+                                ? <div>接続を待っています…（相手がこの端末の QR か URL を開くと、ここに出ます）</div>
+                                : <div>
+                                    送る相手を選んでください（複数可）
+                                    <Menu selectedKeys={connection.selectedIds.length > 0 ? connection.selectedIds : []}
+                                        onSelect={(item) => dispatch(connectionAction.selectItem(item.key))}
+                                        onDeselect={(item) => dispatch(connectionAction.deselectItem(item.key))}
+                                        items={connection.list.map(e => getItem(e, e, null))}
+                                        multiple={true} />
+                                </div>
+                        }
+                        <details>
+                            <summary>相手の ID を入力してつなぐ</summary>
+                            <Space direction="horizontal" size="large" style={{ marginTop: 8 }}>
+                                <Input placeholder={"相手の ID"}
+                                    onChange={e => { setStr(e.target.value); dispatch(connectionAction.changeConnectionInput(e.target.value)) }}
+                                    required={true}
+                                    value={pid}
+                                />
+                                <Button onClick={handleConnectOtherPeer}
+                                    loading={connection.loading}>接続</Button>
+                            </Space>
+                        </details>
+                    </Space>
                 </Card>
                 <Card title="ファイル">
                     <Upload fileList={fileList}
