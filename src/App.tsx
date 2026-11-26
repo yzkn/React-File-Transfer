@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Button, Card, Col, Input, Menu, MenuProps, message, Row, Space, Upload, UploadFile } from "antd";
+import { Button, Card, Col, Input, Menu, MenuProps, message, Modal, Progress, Row, Space, Upload, UploadFile } from "antd";
 import { CopyOutlined, UploadOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import { startPeer } from "./store/peer/peerActions";
 import * as connectionAction from "./store/connection/connectionActions"
-import { DataType, PeerConnection } from "./helpers/peer";
+import { DataType, DECLINED_ERROR, FileOffer, NO_RESPONSE_ERROR, PeerConnection } from "./helpers/peer";
 import { useAsyncState } from "./helpers/hooks";
+import { clearFinishedTransfers, formatSize, Transfer, useTransfers } from "./helpers/transfers";
 
 import { QRCodeSVG } from 'qrcode.react';
 import queryString from 'query-string';
@@ -26,6 +27,57 @@ function getItem(
         label,
         type,
     } as MenuItem;
+}
+
+// 受け取る前の確認。時間切れ（送り手があきらめる時間）で、断ったことにして閉じる
+const confirmOffer = (offer: FileOffer) => new Promise<boolean>((resolve) => {
+    let settled = false
+    const settle = (accepted: boolean) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(accepted)
+    }
+    const modal = Modal.confirm({
+        title: "ファイルを受け取りますか",
+        content: offer.peerId + " から「" + offer.fileName + "」（" + formatSize(offer.size) + "）",
+        okText: "受け取る",
+        cancelText: "断る",
+        onOk: () => settle(true),
+        onCancel: () => settle(false),
+    })
+    const timer = setTimeout(() => {
+        modal.destroy()
+        settle(false)
+    }, offer.timeoutMs)
+})
+
+const transferStatusText = (t: Transfer) => {
+    switch (t.status) {
+        case 'waiting': return t.direction === 'send' ? "相手の確認待ち" : "確認待ち"
+        case 'active': return t.direction === 'send' ? "送信中" : "受信中"
+        case 'done': return t.direction === 'send' ? "相手が受け取りました" : "受け取りました"
+        case 'declined': return t.direction === 'send' ? "相手が断りました" : "断りました"
+        case 'failed': return "失敗しました"
+    }
+}
+
+const TransferRow: React.FC<{ t: Transfer }> = ({ t }) => {
+    const percent = t.size > 0 ? Math.floor(t.done * 100 / t.size) : (t.status === 'done' ? 100 : 0)
+    const status = t.status === 'done' ? 'success'
+        : (t.status === 'failed' || t.status === 'declined') ? 'exception'
+            : t.status === 'active' ? 'active' : 'normal'
+    return (
+        <div className="transfer-row" data-transfer-direction={t.direction} data-transfer-status={t.status}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ wordBreak: 'break-all' }}>
+                    {t.direction === 'send' ? "送信 → " : "受信 ← "}{t.peerId}: {t.fileName}
+                </span>
+                <span>{transferStatusText(t)}（{formatSize(t.done)} / {formatSize(t.size)}）</span>
+            </div>
+            <Progress percent={percent} status={status} size="small" />
+        </div>
+    )
 }
 
 export const App: React.FC = () => {
@@ -55,38 +107,45 @@ export const App: React.FC = () => {
             message.warning("Please select a connection")
             return
         }
-        try {
-            await setSendLoading(true);
+        await setSendLoading(true);
+        // 1 件が断られた・失敗しても、残りは送る
+        let succeeded = 0
+        let failed = 0
+        for (let i = 0; i < fileList.length; i++) {
+            const file = fileList[i] as unknown as File;
+            let blob = new Blob([file], { type: file.type });
 
-            for (let i = 0; i < fileList.length; i++) {
-                const file = fileList[i] as unknown as File;
-                let blob = new Blob([file], { type: file.type });
-
-                for (let j = 0; j < connection.selectedIds.length; j++) {
-                    const selectedId = connection.selectedIds[j];
+            for (let j = 0; j < connection.selectedIds.length; j++) {
+                const selectedId = connection.selectedIds[j];
+                try {
                     await PeerConnection.sendConnection(selectedId, {
                         dataType: DataType.FILE,
                         file: blob,
                         fileName: file.name,
                         fileType: file.type
                     });
+                    succeeded++
+                } catch (err) {
+                    failed++
+                    console.log(err)
+                    message.error(sendErrorMessage(selectedId, file.name, err))
                 }
             }
-
-            await setSendLoading(false)
-            // sendConnection は相手からの受け取りの知らせを待つので、ここに来たら届いている
+        }
+        await setSendLoading(false)
+        // sendConnection は相手からの受け取りの知らせを待つので、成功したものは届いている
+        if (succeeded > 0 && failed === 0) {
             message.success("送信しました（相手が受け取りました）")
-        } catch (err) {
-            await setSendLoading(false)
-            console.log(err)
-            const detail = err instanceof Error ? err.message : String(err)
-            if (detail.startsWith("No acknowledgement")) {
-                message.error("送信できたか分かりません: 相手から受け取りの知らせが届きませんでした")
-            } else {
-                message.error("送信できませんでした: " + detail)
-            }
+        } else if (succeeded > 0) {
+            message.warning("一部を送信しました（受け取られた " + succeeded + " 件・届かなかった " + failed + " 件）")
         }
     }
+
+    useEffect(() => {
+        PeerConnection.setOfferHandler(confirmOffer)
+    }, [])
+
+    const transfers = useTransfers()
 
     const [pid, setStr] = useState("");
 
@@ -207,9 +266,32 @@ export const App: React.FC = () => {
                         {sendLoading ? '送信中' : '送信'}
                     </Button>
                 </Card>
+                {transfers.length > 0 &&
+                    <Card title="送受信の状況"
+                        extra={<Button size="small" onClick={clearFinishedTransfers}>終わったものを消す</Button>}>
+                        <Space direction="vertical" style={{ width: '100%' }}>
+                            {transfers.map(t => <TransferRow key={t.direction + t.id} t={t} />)}
+                        </Space>
+                    </Card>
+                }
             </Col>
         </Row>
     )
+}
+
+// 送信の失敗を、利用者に分かる言葉にする
+const sendErrorMessage = (peerId: string, fileName: string, err: unknown) => {
+    const detail = err instanceof Error ? err.message : String(err)
+    if (detail === DECLINED_ERROR) {
+        return "「" + fileName + "」: 相手（" + peerId + "）が受け取りを断りました"
+    }
+    if (detail === NO_RESPONSE_ERROR) {
+        return "「" + fileName + "」: 相手（" + peerId + "）が受け取るかどうかを決めませんでした"
+    }
+    if (detail.startsWith("No acknowledgement")) {
+        return "「" + fileName + "」: 送信できたか分かりません。相手（" + peerId + "）から受け取りの知らせが届きませんでした"
+    }
+    return "「" + fileName + "」を送信できませんでした: " + detail
 }
 
 export default App
