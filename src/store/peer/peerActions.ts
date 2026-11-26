@@ -24,15 +24,15 @@ export const startPeer: () => (dispatch: Dispatch) => Promise<void>
             const id = await PeerConnection.startPeerSession()
             PeerConnection.onIncomingConnection((conn) => {
                 const peerId = conn.peer
-                message.info("Incoming connection: " + peerId)
+                message.info("接続されました: " + peerId)
                 dispatch(addConnectionList(peerId))
                 PeerConnection.onConnectionDisconnected(peerId, () => {
-                    message.info("Connection closed: " + peerId)
+                    message.info("接続が切れました: " + peerId)
                     dispatch(removeConnectionList(peerId))
                 })
                 PeerConnection.onConnectionReceiveData(peerId, (file) => {
                     if (handleReceivedText(peerId, file)) return
-                    message.info("Receiving file " + file.fileName + " from " + peerId)
+                    message.info(peerId + " からファイル「" + file.fileName + "」を受け取っています")
                     if (file.dataType === DataType.FILE) {
                         download(file.file || '', file.fileName || "fileName", file.fileType)
                     }
