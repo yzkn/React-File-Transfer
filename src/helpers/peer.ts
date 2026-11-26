@@ -137,6 +137,7 @@ const generateId = () => {
 
 
 const PEERJS_ID = generateId();
+const MAX_ID_RETRIES = 5;
 
 let peer: Peer | undefined
 let connectionMap: Map<string, DataConnection> = new Map<string, DataConnection>()
@@ -245,28 +246,45 @@ const trackConnection = (conn: DataConnection) => {
 export const PeerConnection = {
     getPeer: () => peer,
     startPeerSession: () => new Promise<string>((resolve, reject) => {
-        try {
-            let opened = false
-            peer = new Peer(PEERJS_ID)
-            peer.on('open', (id) => {
-                console.log('My ID: ' + id)
-                opened = true
-                resolve(id)
-            }).on('error', (err) => {
+        // 自分の ID が他と重なった（unavailable-id）ときは、ID を作り直して取り直す
+        let retries = 0
+        const start = (id: string) => {
+            try {
+                const p = new Peer(id)
+                peer = p
+                let opened = false
+                p.on('open', (id) => {
+                    opened = true
+                    console.log('My ID: ' + id)
+                    resolve(id)
+                }).on('error', (err) => {
+                    console.log(err)
+                    if (!opened && err.type === 'unavailable-id') {
+                        p.destroy()
+                        if (retries < MAX_ID_RETRIES) {
+                            retries++
+                            start(generateId())
+                        } else {
+                            message.error('ID を取得できませんでした。ページを読み込み直してください')
+                            reject(err)
+                        }
+                        return
+                    }
+                    // 相手が見つからないエラーは connectPeer の呼び出し側で表示する（二重に出さない）
+                    if (err.type !== 'peer-unavailable') {
+                        message.error(err.message)
+                    }
+                    // 準備（open）の前に失敗したら、待っている側に知らせる
+                    if (!opened) {
+                        reject(err)
+                    }
+                })
+            } catch (err) {
                 console.log(err)
-                // 相手が見つからないエラーは connectPeer の呼び出し側で表示する（二重に出さない）
-                if (err.type !== 'peer-unavailable') {
-                    message.error(err.message)
-                }
-                // 準備（open）の前に失敗したら、待っている側に知らせる
-                if (!opened) {
-                    reject(err)
-                }
-            })
-        } catch (err) {
-            console.log(err)
-            reject(err)
+                reject(err)
+            }
         }
+        start(PEERJS_ID)
     }),
     closePeerSession: () => new Promise<void>((resolve, reject) => {
         try {
