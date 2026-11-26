@@ -3,7 +3,9 @@ import { message } from "antd";
 
 export enum DataType {
     FILE = 'FILE',
-    OTHER = 'OTHER'
+    OTHER = 'OTHER',
+    // 受け手が FILE を受け取ったことを送り手に知らせる
+    ACK = 'ACK'
 }
 
 export interface Data {
@@ -12,6 +14,22 @@ export interface Data {
     fileName?: string
     fileType?: string
     message?: string
+    // 送り手が付ける転送ごとの ID。受け手は同じ ID で ACK を返す
+    transferId?: string
+}
+
+// 接続の時間切れ（相手が応答しないとき）
+const CONNECT_TIMEOUT_MS = 15000
+// 受け取りの知らせ（ACK）を待つ時間: 基本の時間 + 大きさに応じた時間（約 50KB/秒 を下限の速さとみる）
+const ACK_TIMEOUT_BASE_MS = 60000
+const ACK_BYTES_PER_MS = 50
+
+const newTransferId = () => Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10)
+
+interface PendingAck {
+    peerId: string
+    resolve: () => void
+    reject: (err: Error) => void
 }
 
 const generateId = () => {
@@ -32,18 +50,47 @@ const PEERJS_ID = generateId();
 
 let peer: Peer | undefined
 let connectionMap: Map<string, DataConnection> = new Map<string, DataConnection>()
+let pendingAcks: Map<string, PendingAck> = new Map<string, PendingAck>()
+
+// その相手への送信で、受け取りの知らせを待っているものをすべて失敗にする
+const rejectPendingAcks = (peerId: string, err: Error) => {
+    Array.from(pendingAcks.entries()).forEach(([transferId, pending]) => {
+        if (pending.peerId === peerId) {
+            pendingAcks.delete(transferId)
+            pending.reject(err)
+        }
+    })
+}
+
+const trackConnection = (conn: DataConnection) => {
+    connectionMap.set(conn.peer, conn)
+    conn.on('close', () => {
+        rejectPendingAcks(conn.peer, new Error("Connection closed: " + conn.peer))
+    }).on('error', (err) => {
+        rejectPendingAcks(conn.peer, err)
+    })
+}
 
 export const PeerConnection = {
     getPeer: () => peer,
     startPeerSession: () => new Promise<string>((resolve, reject) => {
         try {
+            let opened = false
             peer = new Peer(PEERJS_ID)
             peer.on('open', (id) => {
                 console.log('My ID: ' + id)
+                opened = true
                 resolve(id)
             }).on('error', (err) => {
                 console.log(err)
-                message.error(err.message)
+                // 相手が見つからないエラーは connectPeer の呼び出し側で表示する（二重に出さない）
+                if (err.type !== 'peer-unavailable') {
+                    message.error(err.message)
+                }
+                // 準備（open）の前に失敗したら、待っている側に知らせる
+                if (!opened) {
+                    reject(err)
+                }
             })
         } catch (err) {
             console.log(err)
@@ -76,15 +123,30 @@ export const PeerConnection = {
             if (!conn) {
                 reject(new Error("Connection can't be established"))
             } else {
+                let settled = false
+                const finish = (err?: Error) => {
+                    if (settled) return
+                    settled = true
+                    clearTimeout(timer)
+                    peer?.removeListener('error', handlePeerError)
+                    if (err) {
+                        reject(err)
+                    } else {
+                        resolve()
+                    }
+                }
+                const timer = setTimeout(() => {
+                    conn.close()
+                    finish(new Error("Connection timed out: " + id))
+                }, CONNECT_TIMEOUT_MS)
+
                 conn.on('open', function () {
                     console.log("Connect to: " + id)
-                    connectionMap.set(id, conn)
-                    peer?.removeListener('error', handlePeerError)
-                    resolve()
+                    trackConnection(conn)
+                    finish()
                 }).on('error', function (err) {
                     console.log(err)
-                    peer?.removeListener('error', handlePeerError)
-                    reject(err)
+                    finish(err)
                 })
 
                 // When the connection fails due to expiry, the error gets emmitted
@@ -94,7 +156,7 @@ export const PeerConnection = {
                     if (err.type === 'peer-unavailable') {
                         const messageSplit = err.message.split(' ')
                         const peerId = messageSplit[messageSplit.length - 1]
-                        if (id === peerId) reject(err)
+                        if (id === peerId) finish(err)
                     }
                 }
                 peer.on('error', handlePeerError);
@@ -106,7 +168,7 @@ export const PeerConnection = {
     onIncomingConnection: (callback: (conn: DataConnection) => void) => {
         peer?.on('connection', function (conn) {
             console.log("Incoming connection: " + conn.peer)
-            connectionMap.set(conn.peer, conn)
+            trackConnection(conn)
             callback(conn)
         });
     },
@@ -126,19 +188,40 @@ export const PeerConnection = {
             });
         }
     },
+    // 相手から受け取りの知らせ（ACK）が届いたら resolve する（送り出しただけでは resolve しない）
     sendConnection: (id: string, data: Data): Promise<void> => new Promise((resolve, reject) => {
-        if (!connectionMap.has(id)) {
-            reject(new Error("Connection didn't exist"))
+        const conn = connectionMap.get(id)
+        if (!conn || !conn.open) {
+            reject(new Error("Connection didn't exist: " + id))
+            return
+        }
+        const transferId = newTransferId()
+        const size = data.file ? data.file.size : 0
+        const timer = setTimeout(() => {
+            if (pendingAcks.delete(transferId)) {
+                reject(new Error("No acknowledgement from " + id))
+            }
+        }, ACK_TIMEOUT_BASE_MS + Math.ceil(size / ACK_BYTES_PER_MS))
+        pendingAcks.set(transferId, {
+            peerId: id,
+            resolve: () => { clearTimeout(timer); resolve() },
+            reject: (err) => { clearTimeout(timer); reject(err) }
+        })
+        const fail = (err: unknown) => {
+            const pending = pendingAcks.get(transferId)
+            if (pending) {
+                pendingAcks.delete(transferId)
+                pending.reject(err instanceof Error ? err : new Error(String(err)))
+            }
         }
         try {
-            let conn = connectionMap.get(id);
-            if (conn) {
-                conn.send(data)
+            const sent = conn.send({ ...data, transferId }) as unknown
+            if (sent instanceof Promise) {
+                sent.catch(fail)
             }
         } catch (err) {
-            reject(err)
+            fail(err)
         }
-        resolve()
     }),
     onConnectionReceiveData: (id: string, callback: (f: Data) => void) => {
         if (!peer) {
@@ -150,9 +233,25 @@ export const PeerConnection = {
         let conn = connectionMap.get(id)
         if (conn) {
             conn.on('data', function (receivedData) {
-                console.log("Receiving data from " + id)
                 let data = receivedData as Data
+                if (data.dataType === DataType.ACK) {
+                    // こちらから送ったものを、相手が受け取った
+                    const pending = data.transferId ? pendingAcks.get(data.transferId) : undefined
+                    if (pending && pending.peerId === id) {
+                        pendingAcks.delete(data.transferId as string)
+                        pending.resolve()
+                    }
+                    return
+                }
+                console.log("Receiving data from " + id)
                 callback(data)
+                if (data.dataType === DataType.FILE && data.transferId) {
+                    try {
+                        conn?.send({ dataType: DataType.ACK, transferId: data.transferId })
+                    } catch (err) {
+                        console.log(err)
+                    }
+                }
             })
         }
     }
