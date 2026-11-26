@@ -4,6 +4,7 @@ import { DataType, PeerConnection } from "../../helpers/peer";
 import { message } from "antd";
 import { addConnectionList, removeConnectionList } from "../connection/connectionActions";
 import download from "js-file-download";
+import { handleReceivedText } from "../../helpers/textMessages";
 
 export const startPeerSession = (id: string) => ({
     type: PeerActionType.PEER_SESSION_START, id
@@ -30,6 +31,7 @@ export const startPeer: () => (dispatch: Dispatch) => Promise<void>
                     dispatch(removeConnectionList(peerId))
                 })
                 PeerConnection.onConnectionReceiveData(peerId, (file) => {
+                    if (handleReceivedText(peerId, file)) return
                     message.info("Receiving file " + file.fileName + " from " + peerId)
                     if (file.dataType === DataType.FILE) {
                         download(file.file || '', file.fileName || "fileName", file.fileType)

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Button, Card, Col, Input, Menu, MenuProps, message, Row, Space, Upload, UploadFile } from "antd";
-import { CopyOutlined, UploadOutlined } from "@ant-design/icons";
+import { Button, Card, Col, Input, List, Menu, MenuProps, message, Row, Space, Typography, Upload, UploadFile } from "antd";
+import { CopyOutlined, DeleteOutlined, ExportOutlined, SendOutlined, UploadOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import { startPeer } from "./store/peer/peerActions";
 import * as connectionAction from "./store/connection/connectionActions"
 import { DataType, PeerConnection } from "./helpers/peer";
 import { useAsyncState } from "./helpers/hooks";
+import { clearReceivedTexts, removeReceivedText, toOpenableUrl, useReceivedTexts } from "./helpers/textMessages";
 
 import { QRCodeSVG } from 'qrcode.react';
 import queryString from 'query-string';
@@ -83,6 +84,47 @@ export const App: React.FC = () => {
             await setSendLoading(false)
             console.log(err)
             message.error("Error when sending file")
+        }
+    }
+
+    const [text, setText] = useState("")
+    const [textSending, setTextSending] = useState(false)
+    const receivedTexts = useReceivedTexts()
+
+    const handleSendText = async () => {
+        if (text.trim() === "") {
+            message.warning("送るテキストを入力してください")
+            return
+        }
+        if (connection.selectedIds.length === 0) {
+            message.warning("送る相手を選んでください")
+            return
+        }
+        setTextSending(true)
+        try {
+            for (const selectedId of connection.selectedIds) {
+                await PeerConnection.sendConnection(selectedId, {
+                    dataType: DataType.OTHER,
+                    message: text
+                })
+            }
+            message.info("テキストを送りました")
+            setText("")
+        } catch (err) {
+            console.log(err)
+            message.error("テキストを送れませんでした")
+        } finally {
+            setTextSending(false)
+        }
+    }
+
+    const copyText = async (value: string) => {
+        try {
+            await navigator.clipboard.writeText(value)
+            message.info("コピーしました")
+        } catch (err) {
+            console.log(err)
+            message.error("コピーできませんでした")
         }
     }
 
@@ -198,6 +240,60 @@ export const App: React.FC = () => {
                     >
                         {sendLoading ? '送信中' : '送信'}
                     </Button>
+                </Card>
+                <Card title="テキスト・URL">
+                    <Input.TextArea
+                        aria-label="送るテキスト"
+                        placeholder="送るテキストや URL"
+                        autoSize={{ minRows: 2, maxRows: 8 }}
+                        value={text}
+                        onChange={e => setText(e.target.value)}
+                    />
+                    <Button
+                        type="primary"
+                        icon={<SendOutlined />}
+                        onClick={handleSendText}
+                        disabled={text.trim() === ""}
+                        loading={textSending}
+                        style={{ marginTop: 16 }}
+                    >
+                        テキストを送信
+                    </Button>
+                    {
+                        receivedTexts.length > 0 &&
+                        <List
+                            style={{ marginTop: 16 }}
+                            header={
+                                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                                    <span>受け取ったテキスト</span>
+                                    <Button size="small" onClick={clearReceivedTexts}>すべて消す</Button>
+                                </Space>
+                            }
+                            bordered
+                            dataSource={receivedTexts}
+                            renderItem={(item) => {
+                                const url = toOpenableUrl(item.text)
+                                return (
+                                    <List.Item
+                                        actions={[
+                                            <Button key="copy" size="small" icon={<CopyOutlined />} onClick={() => copyText(item.text)}>コピー</Button>,
+                                            ...(url ? [<Button key="open" size="small" icon={<ExportOutlined />} href={url} target="_blank" rel="noopener noreferrer">開く</Button>] : []),
+                                            <Button key="delete" size="small" icon={<DeleteOutlined />} aria-label="消す" onClick={() => removeReceivedText(item.key)} />
+                                        ]}
+                                    >
+                                        <List.Item.Meta
+                                            description={item.from + " から・" + item.receivedAt.toLocaleTimeString()}
+                                            title={
+                                                <Typography.Paragraph style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", marginBottom: 0 }}>
+                                                    {item.text}
+                                                </Typography.Paragraph>
+                                            }
+                                        />
+                                    </List.Item>
+                                )
+                            }}
+                        />
+                    }
                 </Card>
             </Col>
         </Row>
