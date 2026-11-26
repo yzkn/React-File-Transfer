@@ -47,5 +47,25 @@ export const connectPeer: (id: string) => (dispatch: Dispatch) => Promise<void>
         } catch (err) {
             dispatch(setLoading(false))
             console.log(err)
+            message.error(connectErrorMessage(id, err))
         }
     })
+
+// 接続の失敗を、利用者に分かる言葉にする
+const connectErrorMessage = (id: string, err: unknown) => {
+    const e = err as { type?: string, message?: string }
+    const detail = e && e.message ? e.message : String(err)
+    if (e && e.type === 'peer-unavailable') {
+        return "接続できませんでした: 相手（" + id + "）が見つかりません。ID を確かめてください"
+    }
+    if (detail.startsWith("Connection timed out")) {
+        return "接続できませんでした: 相手（" + id + "）から応答がありません"
+    }
+    if (detail.startsWith("Peer doesn't start yet")) {
+        return "接続できませんでした: こちらの準備ができていません。しばらくしてからもう一度試してください"
+    }
+    if (detail.startsWith("Connection existed")) {
+        return "すでに接続しています（" + id + "）"
+    }
+    return "接続できませんでした（" + id + "）: " + detail
+}

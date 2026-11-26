@@ -34,10 +34,6 @@ export const App: React.FC = () => {
     const connection = useAppSelector((state) => state.connection)
     const dispatch = useAppDispatch()
 
-    const handleStartSession = () => {
-        dispatch(startPeer())
-    }
-
     const handleConnectOtherPeer = () => {
         connection.id != null ? dispatch(connectionAction.connectPeer(connection.id || "")) : message.warning("Please enter ID")
     }
@@ -78,11 +74,17 @@ export const App: React.FC = () => {
             }
 
             await setSendLoading(false)
-            message.info("Send file successfully")
+            // sendConnection は相手からの受け取りの知らせを待つので、ここに来たら届いている
+            message.success("送信しました（相手が受け取りました）")
         } catch (err) {
             await setSendLoading(false)
             console.log(err)
-            message.error("Error when sending file")
+            const detail = err instanceof Error ? err.message : String(err)
+            if (detail.startsWith("No acknowledgement")) {
+                message.error("送信できたか分かりません: 相手から受け取りの知らせが届きませんでした")
+            } else {
+                message.error("送信できませんでした: " + detail)
+            }
         }
     }
 
@@ -92,14 +94,20 @@ export const App: React.FC = () => {
         const parsed = queryString.parse(window.location.search);
 
         const pid = (parsed?.id || "") as string;
-        handleStartSession();
 
         if (pid !== "") {
             setStr(pid);
             dispatch(connectionAction.changeConnectionInput(pid));
+        }
 
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+        // 自分の準備（シグナリングのサーバーへの登録）が終わるのを待ってから接続する
+        await dispatch(startPeer());
 
+        if (pid !== "") {
+            if (!PeerConnection.getPeer()?.open) {
+                message.error("接続できませんでした: こちらの準備ができていません。ページを読み込み直してください");
+                return;
+            }
             dispatch(connectionAction.connectPeer(pid));
         }
     };
@@ -182,7 +190,7 @@ export const App: React.FC = () => {
                     <Upload fileList={fileList}
                         maxCount={10}
                         multiple={true}
-                        onRemove={() => setFileList([])}
+                        onRemove={(file) => setFileList(fileList.filter((f: UploadFile) => f.uid !== file.uid))}
                         beforeUpload={(_, fileList) => {
                             setFileList(fileList)
                             return false
