@@ -533,6 +533,8 @@ export const PeerConnection = {
                         return
                     }
                     default:
+                        // テキストなど、分割しないデータ。送った側は受け取りの知らせ（ACK）を待つので返す
+                        if (transferId) reply({ dataType: DataType.ACK, transferId })
                         console.log("Receiving data from " + id)
                         callback(data)
                 }
