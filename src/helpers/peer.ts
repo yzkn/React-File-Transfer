@@ -359,8 +359,36 @@ export const PeerConnection = {
     onIncomingConnection: (callback: (conn: DataConnection) => void) => {
         peer?.on('connection', function (conn) {
             console.log("Incoming connection: " + conn.peer)
-            trackConnection(conn)
-            callback(conn)
+            // データの接続が開く前に一覧に足すと、その間の送信が黙って捨てられる。open を待ってから登録する
+            let settled = false
+            const accept = () => {
+                if (settled) return
+                settled = true
+                clearTimeout(timer)
+                console.log("Incoming connection opened: " + conn.peer)
+                trackConnection(conn)
+                callback(conn)
+            }
+            const discard = (reason: string) => {
+                if (settled) return
+                settled = true
+                clearTimeout(timer)
+                console.log("Incoming connection " + reason + ": " + conn.peer)
+            }
+            const timer = setTimeout(() => {
+                discard("timed out before open")
+                conn.close()
+            }, CONNECT_TIMEOUT_MS)
+            if (conn.open) {
+                accept()
+                return
+            }
+            conn.on('open', accept)
+                .on('close', () => discard("closed before open"))
+                .on('error', (err) => {
+                    console.log(err)
+                    discard("failed before open")
+                })
         });
     },
     onConnectionDisconnected: (id: string, callback: () => void) => {
