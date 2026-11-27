@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Button, Card, Col, Input, List, Menu, MenuProps, message, Modal, Progress, Row, Space, Typography, Upload, UploadFile } from "antd";
-import { CopyOutlined, DeleteOutlined, ExportOutlined, SendOutlined, UploadOutlined } from "@ant-design/icons";
+import { CopyOutlined, DeleteOutlined, ExportOutlined, InboxOutlined, SendOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
 import { startPeer } from "./store/peer/peerActions";
 import * as connectionAction from "./store/connection/connectionActions"
@@ -29,6 +29,8 @@ function getItem(
         type,
     } as MenuItem;
 }
+
+const MAX_FILES = 10
 
 // 受け取る前の確認。時間切れ（送り手があきらめる時間）で、断ったことにして閉じる
 const confirmOffer = (offer: FileOffer) => new Promise<boolean>((resolve) => {
@@ -93,6 +95,33 @@ export const App: React.FC = () => {
 
     const [fileList, setFileList] = useAsyncState([] as UploadFile[])
     const [sendLoading, setSendLoading] = useAsyncState(false)
+
+    // 送信できない理由（ボタンを押せなくし、下に添える）
+    const hasTarget = !!connection.selectedId && connection.selectedIds.length > 0
+    const sendBlockedReason = fileList.length === 0
+        ? 'ファイルを選んでください'
+        : !hasTarget
+            ? (connection.list.length === 0
+                ? '送る相手がいません。「宛先」で相手の ID に接続するか、相手にこの画面の QR を読んでもらってください'
+                : '「宛先」で送る相手を選んでください')
+            : ''
+
+    // Ctrl+V（貼り付け）でファイルを足す。入力欄への貼り付けはそのまま
+    useEffect(() => {
+        const onPaste = (e: ClipboardEvent) => {
+            const target = e.target as HTMLElement | null
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+            const files = Array.from(e.clipboardData?.files || [])
+            if (files.length === 0) return
+            e.preventDefault()
+            const added = files.map((f, i) => Object.assign(f, { uid: `paste-${Date.now()}-${i}` }) as unknown as UploadFile)
+            const next = [...fileList, ...added].slice(0, MAX_FILES)
+            setFileList(next)
+            message.info(`${next.length - fileList.length} 件のファイルを貼り付けました`)
+        }
+        document.addEventListener('paste', onPaste)
+        return () => document.removeEventListener('paste', onPaste)
+    }, [fileList, setFileList])
 
     const handleUpload = async () => {
         if (fileList.length === 0) {
@@ -293,25 +322,31 @@ export const App: React.FC = () => {
                     </Space>
                 </Card>
                 <Card title="ファイル">
-                    <Upload fileList={fileList}
-                        maxCount={10}
+                    <Upload.Dragger fileList={fileList}
+                        maxCount={MAX_FILES}
                         multiple={true}
                         onRemove={(file) => setFileList(fileList.filter((f: UploadFile) => f.uid !== file.uid))}
                         beforeUpload={(_, fileList) => {
                             setFileList(fileList)
                             return false
                         }}>
-                        <Button icon={<UploadOutlined />}>選択</Button>
-                    </Upload>
+                        <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+                        <p className="ant-upload-text">ここにファイルをドロップ、またはクリックして選択</p>
+                        <p className="ant-upload-hint">Ctrl+V で貼り付けても追加できます（{MAX_FILES} 件まで）</p>
+                    </Upload.Dragger>
                     <Button
                         type="primary"
                         onClick={handleUpload}
-                        disabled={fileList.length === 0}
+                        disabled={sendBlockedReason !== ''}
                         loading={sendLoading}
                         style={{ marginTop: 16 }}
                     >
                         {sendLoading ? '送信中' : '送信'}
                     </Button>
+                    {sendBlockedReason !== '' &&
+                        <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8 }} data-testid="send-blocked-reason">
+                            {sendBlockedReason}
+                        </Typography.Text>}
                 </Card>
                 <Card title="テキスト・URL">
                     <Input.TextArea
