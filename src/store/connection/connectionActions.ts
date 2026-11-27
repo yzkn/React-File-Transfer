@@ -3,6 +3,7 @@ import { Dispatch } from "redux";
 import { DataType, PeerConnection } from "../../helpers/peer";
 import { message } from "antd";
 import download from "js-file-download";
+import { handleReceivedText } from "../../helpers/textMessages";
 
 export const changeConnectionInput = (id: string) => ({
     type: ConnectionActionType.CONNECTION_INPUT_CHANGE, id
@@ -37,6 +38,7 @@ export const connectPeer: (id: string) => (dispatch: Dispatch) => Promise<void>
                 dispatch(removeConnectionList(id))
             })
             PeerConnection.onConnectionReceiveData(id, (file) => {
+                if (handleReceivedText(id, file)) return
                 message.info(id + " からファイル「" + file.fileName + "」を受け取っています")
                 if (file.dataType === DataType.FILE) {
                     download(file.file || '', file.fileName || "fileName", file.fileType)
