@@ -488,5 +488,20 @@
   "scope": "https://fltr.pages.dev/",
   "short_name": "File Transfer",
   "start_url": "https://fltr.pages.dev/",
-  "theme_color": "#c0e4fc"
+  "theme_color": "#c0e4fc",
+  "share_target": {
+    "action": "./share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "files",
+          "accept": [
+            "*/*"
+          ]
+        }
+      ]
+    }
+  }
 }

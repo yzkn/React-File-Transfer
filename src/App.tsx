@@ -14,6 +14,28 @@ import queryString from 'query-string';
 
 type MenuItem = Required<MenuProps>['items'][number]
 
+// 共有メニュー（service-worker.ts の share-target）から渡されたファイルを取り出す
+const SHARE_CACHE = 'share-target'
+const loadSharedFiles = async (): Promise<UploadFile[]> => {
+    if (!('caches' in window)) return []
+    const cache = await caches.open(SHARE_CACHE)
+    const keys = [...await cache.keys()]
+    const index = (r: Request) => Number(r.url.split('/').pop())
+    keys.sort((a, b) => index(a) - index(b))
+    const files: UploadFile[] = []
+    for (const key of keys) {
+        const res = await cache.match(key)
+        if (!res) continue
+        // Cache の中身は消すと読めなくなるので、先にメモリーに読み切る
+        const data = await res.arrayBuffer()
+        const name = decodeURIComponent(res.headers.get('X-File-Name') || 'shared')
+        const file = new File([data], name, { type: res.headers.get('Content-Type') || '' })
+        files.push(Object.assign(file, { uid: 'shared-' + key.url }) as unknown as UploadFile)
+        await cache.delete(key)
+    }
+    return files
+}
+
 function getItem(
     label: React.ReactNode,
     key: React.Key,
@@ -226,6 +248,22 @@ export const App: React.FC = () => {
         const parsed = queryString.parse(window.location.search);
 
         const pid = (parsed?.id || "") as string;
+
+        if (parsed?.shared != null) {
+            window.history.replaceState(null, '', window.location.pathname)
+            try {
+                const shared = await loadSharedFiles()
+                if (shared.length > 0) {
+                    await setFileList(shared.slice(0, 10))
+                    message.info(`共有された ${shared.length} 件のファイルを追加しました。送る相手を選んで「送信」を押してください`)
+                } else {
+                    message.warning('共有されたファイルを受け取れませんでした')
+                }
+            } catch (err) {
+                console.log(err)
+                message.warning('共有されたファイルを受け取れませんでした')
+            }
+        }
 
         if (pid !== "") {
             setStr(pid);

@@ -38,6 +38,7 @@ export const startPeer: () => (dispatch: Dispatch) => Promise<void>
                     }
                 })
             })
+            PeerConnection.keepAlive(() => message.info("サーバーに再接続しました"))
             dispatch(startPeerSession(id))
             dispatch(setLoading(false))
         } catch (err) {

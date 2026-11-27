@@ -140,6 +140,7 @@ const PEERJS_ID = generateId();
 const MAX_ID_RETRIES = 5;
 
 let peer: Peer | undefined
+let keepAliveTimer: ReturnType<typeof setTimeout> | undefined
 let connectionMap: Map<string, DataConnection> = new Map<string, DataConnection>()
 let pendingAcks: Map<string, PendingAck> = new Map<string, PendingAck>()
 let sendInboxes: Map<string, TransferInbox> = new Map<string, TransferInbox>()
@@ -298,7 +299,8 @@ export const PeerConnection = {
             reject(err)
         }
     }),
-    connectPeer: (id: string) => new Promise<void>((resolve, reject) => {
+    // timeoutMs（省略時は CONNECT_TIMEOUT_MS）の間に開かなければ閉じて失敗にする（相手がいないのにサーバーから応答が無いことがある）
+    connectPeer: (id: string, timeoutMs?: number) => new Promise<void>((resolve, reject) => {
         if (!peer) {
             reject(new Error("Peer doesn't start yet"))
             return
@@ -327,7 +329,7 @@ export const PeerConnection = {
                 const timer = setTimeout(() => {
                     conn.close()
                     finish(new Error("Connection timed out: " + id))
-                }, CONNECT_TIMEOUT_MS)
+                }, timeoutMs ?? CONNECT_TIMEOUT_MS)
 
                 conn.on('open', function () {
                     console.log("Connect to: " + id)
@@ -540,6 +542,46 @@ export const PeerConnection = {
                 }
             })
         }
+    },
+    isConnected: (id: string) => connectionMap.has(id),
+    // シグナリングのサーバーから切れたら（スマートフォンが裏に回ったときなど）、間隔を延ばしながら取り直す。
+    // 画面が前に戻ったとき・ネットワークが戻ったときにも、すぐに試す。相手との直接の接続は、これとは別に保たれる
+    keepAlive: (onReconnected?: () => void) => {
+        const p = peer
+        if (!p) {
+            throw new Error("Peer doesn't start yet")
+        }
+        let retry = 0
+        const tryReconnect = () => {
+            if (keepAliveTimer) {
+                clearTimeout(keepAliveTimer)
+                keepAliveTimer = undefined
+            }
+            if (p !== peer || p.destroyed || !p.disconnected) return
+            console.log('Reconnecting to the signaling server')
+            p.reconnect()
+            retry++
+            keepAliveTimer = setTimeout(tryReconnect, Math.min(1000 * 2 ** retry, 30000))
+        }
+        p.on('disconnected', () => {
+            console.log('Disconnected from the signaling server')
+            if (!keepAliveTimer) {
+                keepAliveTimer = setTimeout(tryReconnect, 1000)
+            }
+        })
+        p.on('open', () => {
+            if (retry > 0) {
+                retry = 0
+                if (keepAliveTimer) {
+                    clearTimeout(keepAliveTimer)
+                    keepAliveTimer = undefined
+                }
+                onReconnected?.()
+            }
+        })
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') tryReconnect()
+        })
+        window.addEventListener('online', tryReconnect)
     }
-
 }
