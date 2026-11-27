@@ -3,6 +3,7 @@ import { Dispatch } from "redux";
 import { DataType, PeerConnection } from "../../helpers/peer";
 import { message } from "antd";
 import download from "js-file-download";
+import { handleReceivedText } from "../../helpers/textMessages";
 
 export const changeConnectionInput = (id: string) => ({
     type: ConnectionActionType.CONNECTION_INPUT_CHANGE, id
@@ -35,12 +36,13 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 // 接続ができたあとの登録（切断・受信）。自分から張った接続が切れたら、張り直す
 const attachConnection = (id: string, dispatch: Dispatch) => {
     PeerConnection.onConnectionDisconnected(id, () => {
-        message.info("Connection closed: " + id)
+        message.info("接続が切れました: " + id)
         dispatch(removeConnectionList(id))
         reconnectPeer(id, dispatch)
     })
     PeerConnection.onConnectionReceiveData(id, (file) => {
-        message.info("Receiving file " + file.fileName + " from " + id)
+        if (handleReceivedText(id, file)) return
+        message.info(id + " からファイル「" + file.fileName + "」を受け取っています")
         if (file.dataType === DataType.FILE) {
             download(file.file || '', file.fileName || "fileName", file.fileType)
         }
@@ -74,5 +76,25 @@ export const connectPeer: (id: string) => (dispatch: Dispatch) => Promise<void>
         } catch (err) {
             dispatch(setLoading(false))
             console.log(err)
+            message.error(connectErrorMessage(id, err))
         }
     })
+
+// 接続の失敗を、利用者に分かる言葉にする
+const connectErrorMessage = (id: string, err: unknown) => {
+    const e = err as { type?: string, message?: string }
+    const detail = e && e.message ? e.message : String(err)
+    if (e && e.type === 'peer-unavailable') {
+        return "接続できませんでした: 相手（" + id + "）が見つかりません。ID を確かめてください"
+    }
+    if (detail.startsWith("Connection timed out")) {
+        return "接続できませんでした: 相手（" + id + "）から応答がありません"
+    }
+    if (detail.startsWith("Peer doesn't start yet")) {
+        return "接続できませんでした: こちらの準備ができていません。しばらくしてからもう一度試してください"
+    }
+    if (detail.startsWith("Connection existed")) {
+        return "すでに接続しています（" + id + "）"
+    }
+    return "接続できませんでした（" + id + "）: " + detail
+}
